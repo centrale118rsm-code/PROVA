@@ -106,10 +106,20 @@
             border-radius: 12px; cursor: pointer; 
             display: flex; align-items: center; justify-content: center; 
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
         }
         .btn-action span { font-size: 1.5rem; }
         .btn-action:active { transform: scale(0.94); opacity: 0.8; }
         
+        /* Badge Notifiche */
+        .badge-dot {
+            position: absolute; top: 8px; right: 8px;
+            width: 10px; height: 10px; background: #ef4444;
+            border-radius: 50%; border: 2px solid var(--bg-card);
+            display: none; /* di default nascosto */
+        }
+        .badge-dot.visible { display: block; }
+
         /* MENU DROPDOWN */
         #menu-dropdown { 
             position: absolute; top: 55px; right: 0; background: var(--bg-card); 
@@ -304,10 +314,10 @@
         input[type="file"] { display: none; }
         
         /* MODALE GENERICO */
-        #shift-modal, #dinner-modal, #options-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 3000; backdrop-filter: blur(8px); align-items: flex-end; justify-content: center; opacity: 0; transition: opacity 0.3s; }
-        #shift-modal.open, #dinner-modal.open, #options-modal.open { opacity: 1; }
+        #shift-modal, #dinner-modal, #options-modal, #notif-center-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 3000; backdrop-filter: blur(8px); align-items: flex-end; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        #shift-modal.open, #dinner-modal.open, #options-modal.open, #notif-center-modal.open { opacity: 1; }
         .modal-content { background: var(--bg-card); width: 100%; max-width: 600px; border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3); overflow: hidden; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: 85vh; display: flex; flex-direction: column; }
-        #shift-modal.open .modal-content, #dinner-modal.open .modal-content, #options-modal.open .modal-content { transform: translateY(0); }
+        #shift-modal.open .modal-content, #dinner-modal.open .modal-content, #options-modal.open .modal-content, #notif-center-modal.open .modal-content { transform: translateY(0); }
         
         .modal-header { background: var(--bg); color: var(--text-main); padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .header-text h3 { margin: 0; font-size: 1.3rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px;}
@@ -330,6 +340,17 @@
         input:checked + .slider { background-color: var(--primary); }
         input:checked + .slider:before { transform: translateX(22px); }
         
+        /* NOTIFICATION CENTER SPECIFIC */
+        .notif-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        .notif-item { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 15px; position: relative; transition: all 0.2s; }
+        .notif-item.unread { border-left: 4px solid var(--primary); background: #f0f9ff; }
+        body.dark-mode .notif-item.unread { background: #1e293b; border-color: #334155; border-left-color: var(--primary); }
+        .notif-date { font-size: 0.7rem; color: var(--text-sec); margin-bottom: 4px; font-weight: 600; }
+        .notif-text { font-size: 0.9rem; color: var(--text-main); line-height: 1.4; }
+        .btn-del-notif { position: absolute; top: 10px; right: 10px; color: #ef4444; background: none; border: none; cursor: pointer; padding: 5px; border-radius: 50%; }
+        .btn-del-notif:active { background: rgba(239, 68, 68, 0.1); }
+        .no-notif { text-align: center; padding: 40px 20px; color: var(--text-sec); font-size: 0.9rem; }
+
         /* Pulsante Installazione sempre visibile */
         .btn-install { 
             background: var(--text-main); color: var(--bg); border: none; padding: 10px 18px; 
@@ -495,6 +516,27 @@
         </div>
     </div>
 
+    <div id="notif-center-modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="header-text">
+                    <h3><span class="material-icons-round" style="margin-right:10px">notifications</span> NOTIFICHE</h3>
+                    <span>Storico Avvisi</span>
+                </div>
+                <div style="display:flex; gap:10px">
+                    <button class="btn-close-modal" onclick="clearAllNotif()" style="color:#ef4444">
+                        <span class="material-icons-round">delete_sweep</span>
+                    </button>
+                    <button class="btn-close-modal" onclick="closeNotifCenter()">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body notif-list" id="notif-list-container">
+                </div>
+        </div>
+    </div>
+
     <div id="secret-gallery" onclick="nextSecretPhoto()">
         <div class="btn-close-secret" onclick="event.stopPropagation(); closeSecretGallery()">X</div>
         <img id="secret-img" src="" alt="Galleria Segreta">
@@ -547,8 +589,8 @@
                 
                 <div class="option-item" style="display:block">
                     <div style="margin-bottom:10px">
-                        <span style="font-size:1rem; font-weight:700">Notifiche Cambi Turno</span>
-                        <div style="font-size:0.8rem; color:var(--text-sec)">Seleziona gli autisti da monitorare. Ti avviserò se il loro turno cambia rispetto all'ultimo accesso.</div>
+                        <span style="font-size:1rem; font-weight:700">Monitoraggio Turni</span>
+                        <div style="font-size:0.8rem; color:var(--text-sec)">Seleziona chi seguire. Riceverai un avviso nell'app se il turno cambia.</div>
                     </div>
                     <div id="notification-driver-list" class="dinner-checkbox-list" style="padding:0; grid-template-columns: 1fr 1fr;"></div>
                 </div>
@@ -656,6 +698,11 @@
                     <span class="material-icons-round">home</span>
                 </button>
 
+                <button class="btn-action" onclick="openNotifCenter()" style="position:relative">
+                    <span class="material-icons-round">notifications</span>
+                    <span id="notif-badge" class="badge-dot"></span>
+                </button>
+
                 <button class="btn-action" onclick="toggleMenu()">
                     <span class="material-icons-round">more_vert</span>
                 </button>
@@ -712,6 +759,7 @@
         let finalData = [];
         let drivers = [];
         let selectedDrivers = new Set();
+        let notifHistory = []; // Array per le notifiche
         
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -777,21 +825,6 @@
             }
         }
 
-        // --- RICHIESTA PERMESSO NOTIFICHE ---
-        function requestNotificationPermission() {
-            if (!("Notification" in window)) {
-                alert("Questo browser non supporta le notifiche di sistema.");
-                return;
-            }
-            Notification.requestPermission().then((permission) => {
-                if (permission === "granted") {
-                    new Notification("Notifiche Attive", { body: "Ti avviserò qui se cambiano i turni!" });
-                } else {
-                    alert("Permesso negato. Non potrò inviarti notifiche.");
-                }
-            });
-        }
-
         if(localStorage.getItem('theme') === 'dark') {
             document.body.classList.add('dark-mode');
             document.querySelector('#theme-color-meta').setAttribute('content', '#0f172a');
@@ -825,25 +858,6 @@
             
             const tg = document.getElementById('dark-mode-toggle');
             if(tg) tg.checked = document.body.classList.contains('dark-mode');
-            
-            // Aggiungiamo dinamicamente il tasto notifiche se non c'è
-            const container = document.querySelector('#options-modal .modal-body');
-            if(!document.getElementById('btn-enable-notif')) {
-                let div = document.createElement('div');
-                div.className = "option-item";
-                div.innerHTML = `
-                    <div style="display:flex; flex-direction:column">
-                        <span style="font-size:1rem">Notifiche Sistema</span>
-                        <span style="font-size:0.8rem; color:var(--text-sec); font-weight:400">Ricevi avvisi anche fuori app</span>
-                    </div>
-                    <button class="btn-install" id="btn-enable-notif" onclick="requestNotificationPermission()" style="background:var(--primary)">
-                        ATTIVA
-                    </button>
-                `;
-                // Inseriscilo prima del tema scuro
-                const darkToggle = document.querySelector('.switch').closest('.option-item');
-                container.insertBefore(div, darkToggle);
-            }
         }
         
         function closeOptionsModal(e) {
@@ -1039,6 +1053,7 @@
             }
             
             initNotificationOptions();
+            loadNotificationHistory(); // Carica notifiche salvate
             renderTable();
             startLiveClock();
             setTimeout(scrollToToday, 600);
@@ -1046,7 +1061,7 @@
             setTimeout(checkForScheduleChanges, 2000);
         }
 
-        /* --- GESTIONE NOTIFICHE CAMBIO TURNO (LOCALE + PUSH) --- */
+        /* --- GESTIONE NOTIFICHE CAMBIO TURNO E CENTRO NOTIFICHE --- */
         let watchedDrivers = new Set();
 
         function initNotificationOptions() {
@@ -1084,7 +1099,6 @@
             localStorage.setItem('watched_drivers_ids', JSON.stringify([...watchedDrivers]));
         }
 
-        // Helper per tradurre le sigle in parole leggibili
         function getShiftReadableName(code) {
             code = code ? code.toString().trim().toUpperCase() : "";
             if(!code) return "Vuoto";
@@ -1098,7 +1112,7 @@
             if(code.includes("MAL")) return "Malattia";
             if(code.includes("REC")) return "Recupero";
             if(code.includes("CONG")) return "Congedo";
-            return code; // Ritorna il codice se non riconosciuto
+            return code;
         }
 
         function checkForScheduleChanges() {
@@ -1130,7 +1144,6 @@
             if(oldJson) {
                 let oldSnapshot = JSON.parse(oldJson);
                 let changesFound = [];
-                let changesDetails = []; // Per la notifica di sistema
 
                 for (const [key, newVal] of Object.entries(currentSnapshot)) {
                     let oldVal = oldSnapshot[key];
@@ -1142,48 +1155,130 @@
 
                         if(newVal === "||" && oldVal === "||") continue;
 
-                        // Estraiamo il valore puro del turno (prima del primo |)
                         let oldShiftCode = oldVal.split('|')[0];
                         let newShiftCode = newVal.split('|')[0];
 
                         let oldShiftName = getShiftReadableName(oldShiftCode);
                         let newShiftName = getShiftReadableName(newShiftCode);
 
-                        // Costruiamo il messaggio dettagliato
-                        // Esempio: BARBIERI: GENNAIO-20 da Mattina a Pomeriggio
-                        let detailMsg = `<b>${drvName}</b>: ${datePart}<br>
+                        // Crea messaggio dettagliato per popup e centro notifiche
+                        let detailMsg = `<b>${drvName}</b> - ${datePart}<br>
                                          <span style="font-size:0.85rem; color:var(--text-sec)">
                                          Da: <b style="color:#ef4444">${oldShiftName}</b> &rarr; A: <b style="color:#15803d">${newShiftName}</b>
                                          </span>`;
 
                         changesFound.push(detailMsg);
-                        changesDetails.push(`${drvName} (${datePart}): ${oldShiftName} -> ${newShiftName}`);
+                        
+                        // Aggiungi alla storia notifiche
+                        let notifObj = {
+                            id: Date.now() + Math.random(), // ID unico
+                            text: detailMsg,
+                            read: false,
+                            date: new Date().toLocaleString()
+                        };
+                        notifHistory.unshift(notifObj); // Aggiungi in cima
                     }
                 }
 
                 if(changesFound.length > 0) {
-                    showChangeAlert(changesFound);
-                    
-                    // Invio Notifica di Sistema
-                    if (Notification.permission === "granted") {
-                        let bodyText = changesDetails.slice(0, 3).join("\n");
-                        if(changesDetails.length > 3) bodyText += `\n...e altri ${changesDetails.length - 3} cambi.`;
-                        
-                        // NOTA: Su mobile, la notifica comparirà quando l'app si aggiorna in background o viene aperta
-                        new Notification("⚠️ Cambio Turno Rilevato!", {
-                            body: bodyText,
-                            icon: 'logo.png',
-                            vibrate: [200, 100, 200]
-                        });
-                    }
+                    saveNotifications(); // Salva array nel localStorage
+                    updateBadge();       // Accendi il pallino
+                    showChangeAlert(changesFound); // Mostra il popup
                 }
             }
             localStorage.setItem('schedule_snapshot', JSON.stringify(currentSnapshot));
         }
 
+        // --- FUNZIONI CENTRO NOTIFICHE ---
+        function loadNotificationHistory() {
+            let saved = localStorage.getItem('notifications_history');
+            if(saved) {
+                notifHistory = JSON.parse(saved);
+            }
+            updateBadge();
+        }
+
+        function saveNotifications() {
+            localStorage.setItem('notifications_history', JSON.stringify(notifHistory));
+        }
+
+        function updateBadge() {
+            const unreadCount = notifHistory.filter(n => !n.read).length;
+            const badge = document.getElementById('notif-badge');
+            if(unreadCount > 0) {
+                badge.classList.add('visible');
+            } else {
+                badge.classList.remove('visible');
+            }
+        }
+
+        function openNotifCenter() {
+            vibrate();
+            let modal = document.getElementById('notif-center-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('open'), 10);
+            
+            // Renderizza la lista
+            renderNotifList();
+            
+            // Segna tutte come lette dopo 1 secondo che è aperto
+            setTimeout(() => {
+                notifHistory.forEach(n => n.read = true);
+                saveNotifications();
+                updateBadge();
+            }, 1000);
+        }
+
+        function closeNotifCenter() {
+            let modal = document.getElementById('notif-center-modal');
+            modal.classList.remove('open');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        function renderNotifList() {
+            const container = document.getElementById('notif-list-container');
+            container.innerHTML = "";
+
+            if(notifHistory.length === 0) {
+                container.innerHTML = `<div class="no-notif">Nessuna notifica presente.</div>`;
+                return;
+            }
+
+            notifHistory.forEach(item => {
+                let div = document.createElement('div');
+                div.className = `notif-item ${item.read ? '' : 'unread'}`;
+                div.innerHTML = `
+                    <div class="notif-date">${item.date}</div>
+                    <div class="notif-text">${item.text}</div>
+                    <button class="btn-del-notif" onclick="deleteNotif(${item.id})">
+                        <span class="material-icons-round" style="font-size:18px">close</span>
+                    </button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function deleteNotif(id) {
+            vibrate();
+            notifHistory = notifHistory.filter(n => n.id !== id);
+            saveNotifications();
+            renderNotifList();
+            updateBadge();
+        }
+
+        function clearAllNotif() {
+            if(confirm("Eliminare tutte le notifiche?")) {
+                vibrate();
+                notifHistory = [];
+                saveNotifications();
+                renderNotifList();
+                updateBadge();
+            }
+        }
+
         function showChangeAlert(changes) {
             let msg = "Sono stati rilevati cambi turno per gli autisti che segui:<br><br>";
-            msg += changes.slice(0, 5).join("<br><br>"); // Doppio <br> per spaziare meglio i dettagli
+            msg += changes.slice(0, 5).join("<br><br>"); 
             if(changes.length > 5) msg += `<br><br>...e altri ${changes.length - 5}.`;
             msg += "<br><br><small>Controlla il calendario aggiornato.</small>";
 
@@ -1899,3 +1994,5 @@
             return `<div class="cell ${cssClass}">${text}</div>`;
         }
     </script>
+</body>
+</html>

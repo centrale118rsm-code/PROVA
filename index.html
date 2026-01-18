@@ -723,19 +723,16 @@
         let logoClicks = 0;
         let galleryIdx = 1;
         let resetTimer;
-        // CONFIGURA QUI QUANTE FOTO HAI E L'ESTENSIONE
         const TOTAL_SECRET_PHOTOS = 10; 
         const PHOTO_EXT = ".jpg"; 
 
         function secretClick() {
             logoClicks++;
             clearTimeout(resetTimer);
-            
             if (logoClicks >= 5) {
                 openSecretGallery();
                 logoClicks = 0;
             } else {
-                // Reset click counter if user stops clicking for 2 seconds
                 resetTimer = setTimeout(() => { logoClicks = 0; }, 2000);
             }
         }
@@ -763,26 +760,36 @@
             document.getElementById('secret-gallery').classList.remove('open');
         }
 
-        // FUNZIONE INSTALLAZIONE INTELLIGENTE
+        // FUNZIONE INSTALLAZIONE PWA
         function installPWA() {
             if (deferredPrompt) {
-                // Se il browser supporta l'installazione automatica (Android/Chrome)
                 deferredPrompt.prompt();
                 deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted the install prompt');
-                    }
                     deferredPrompt = null;
                 });
             } else {
-                // Se non supportata (iOS o file PWA mancanti) --> Istruzioni manuali
                 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
                 if(isIOS) {
-                    alert("⚠️ ISTRUZIONI PER iPHONE/iPad:\n\n1. Tocca il tasto 'Condividi' del browser (icona quadrato con freccia).\n\n2. Scorri in basso e seleziona 'Aggiungi alla schermata Home'.");
+                    alert("⚠️ ISTRUZIONI PER iPHONE/iPad:\n\n1. Tocca 'Condividi' (quadrato con freccia).\n\n2. Scorri e seleziona 'Aggiungi alla schermata Home'.");
                 } else {
-                    alert("⚠️ INSTALLAZIONE MANUALE:\n\nPer installare l'app, apri il menu del browser (i tre puntini) e cerca la voce 'Installa app' oppure 'Aggiungi a schermata Home'.");
+                    alert("Apri il menu del browser e cerca 'Installa app' o 'Aggiungi a schermata Home'.");
                 }
             }
+        }
+
+        // --- RICHIESTA PERMESSO NOTIFICHE ---
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                alert("Questo browser non supporta le notifiche di sistema.");
+                return;
+            }
+            Notification.requestPermission().then((permission) => {
+                if (permission === "granted") {
+                    new Notification("Notifiche Attive", { body: "Ti avviserò qui se cambiano i turni!" });
+                } else {
+                    alert("Permesso negato. Non potrò inviarti notifiche.");
+                }
+            });
         }
 
         if(localStorage.getItem('theme') === 'dark') {
@@ -818,6 +825,25 @@
             
             const tg = document.getElementById('dark-mode-toggle');
             if(tg) tg.checked = document.body.classList.contains('dark-mode');
+            
+            // Aggiungiamo dinamicamente il tasto notifiche se non c'è
+            const container = document.querySelector('#options-modal .modal-body');
+            if(!document.getElementById('btn-enable-notif')) {
+                let div = document.createElement('div');
+                div.className = "option-item";
+                div.innerHTML = `
+                    <div style="display:flex; flex-direction:column">
+                        <span style="font-size:1rem">Notifiche Sistema</span>
+                        <span style="font-size:0.8rem; color:var(--text-sec); font-weight:400">Ricevi avvisi anche fuori app</span>
+                    </div>
+                    <button class="btn-install" id="btn-enable-notif" onclick="requestNotificationPermission()" style="background:var(--primary)">
+                        ATTIVA
+                    </button>
+                `;
+                // Inseriscilo prima del tema scuro
+                const darkToggle = document.querySelector('.switch').closest('.option-item');
+                container.insertBefore(div, darkToggle);
+            }
         }
         
         function closeOptionsModal(e) {
@@ -850,7 +876,6 @@
             }
         });
 
-        // Register Service Worker for PWA (se esiste)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Fail'));
         }
@@ -1013,21 +1038,20 @@
                 } catch(e) { console.error("Error loading selected drivers", e); }
             }
             
-            // --- INIZIALIZZA NOTIFICHE E TABELLA ---
             initNotificationOptions();
             renderTable();
             startLiveClock();
             setTimeout(scrollToToday, 600);
             
-            // CONTROLLO DIFFERENZE EXCEL
             setTimeout(checkForScheduleChanges, 2000);
         }
 
-        /* --- GESTIONE NOTIFICHE CAMBIO TURNO (LOCALE) --- */
+        /* --- GESTIONE NOTIFICHE CAMBIO TURNO (LOCALE + PUSH) --- */
         let watchedDrivers = new Set();
 
         function initNotificationOptions() {
             const list = document.getElementById('notification-driver-list');
+            if(!list) return;
             list.innerHTML = "";
             
             const saved = localStorage.getItem('watched_drivers_ids');
@@ -1060,6 +1084,23 @@
             localStorage.setItem('watched_drivers_ids', JSON.stringify([...watchedDrivers]));
         }
 
+        // Helper per tradurre le sigle in parole leggibili
+        function getShiftReadableName(code) {
+            code = code ? code.toString().trim().toUpperCase() : "";
+            if(!code) return "Vuoto";
+            if(code === "M" || code.startsWith("MAT")) return "Mattina";
+            if(code === "P" || code.startsWith("POM")) return "Pomeriggio";
+            if(code === "N" || code.startsWith("NOT")) return "Notte";
+            if(code === "R" || code.startsWith("RIP")) return "Riposo";
+            if(code === "SM" || code.startsWith("SMO")) return "Smonto";
+            if(code === "M+N" || code === "MN") return "Mattina+Notte";
+            if(code.includes("FER")) return "Ferie";
+            if(code.includes("MAL")) return "Malattia";
+            if(code.includes("REC")) return "Recupero";
+            if(code.includes("CONG")) return "Congedo";
+            return code; // Ritorna il codice se non riconosciuto
+        }
+
         function checkForScheduleChanges() {
             if(watchedDrivers.size === 0) return;
 
@@ -1089,6 +1130,7 @@
             if(oldJson) {
                 let oldSnapshot = JSON.parse(oldJson);
                 let changesFound = [];
+                let changesDetails = []; // Per la notifica di sistema
 
                 for (const [key, newVal] of Object.entries(currentSnapshot)) {
                     let oldVal = oldSnapshot[key];
@@ -1100,12 +1142,40 @@
 
                         if(newVal === "||" && oldVal === "||") continue;
 
-                        changesFound.push(`<b>${drvName}</b>: ${datePart}`);
+                        // Estraiamo il valore puro del turno (prima del primo |)
+                        let oldShiftCode = oldVal.split('|')[0];
+                        let newShiftCode = newVal.split('|')[0];
+
+                        let oldShiftName = getShiftReadableName(oldShiftCode);
+                        let newShiftName = getShiftReadableName(newShiftCode);
+
+                        // Costruiamo il messaggio dettagliato
+                        // Esempio: BARBIERI: GENNAIO-20 da Mattina a Pomeriggio
+                        let detailMsg = `<b>${drvName}</b>: ${datePart}<br>
+                                         <span style="font-size:0.85rem; color:var(--text-sec)">
+                                         Da: <b style="color:#ef4444">${oldShiftName}</b> &rarr; A: <b style="color:#15803d">${newShiftName}</b>
+                                         </span>`;
+
+                        changesFound.push(detailMsg);
+                        changesDetails.push(`${drvName} (${datePart}): ${oldShiftName} -> ${newShiftName}`);
                     }
                 }
 
                 if(changesFound.length > 0) {
                     showChangeAlert(changesFound);
+                    
+                    // Invio Notifica di Sistema
+                    if (Notification.permission === "granted") {
+                        let bodyText = changesDetails.slice(0, 3).join("\n");
+                        if(changesDetails.length > 3) bodyText += `\n...e altri ${changesDetails.length - 3} cambi.`;
+                        
+                        // NOTA: Su mobile, la notifica comparirà quando l'app si aggiorna in background o viene aperta
+                        new Notification("⚠️ Cambio Turno Rilevato!", {
+                            body: bodyText,
+                            icon: 'logo.png',
+                            vibrate: [200, 100, 200]
+                        });
+                    }
                 }
             }
             localStorage.setItem('schedule_snapshot', JSON.stringify(currentSnapshot));
@@ -1113,8 +1183,8 @@
 
         function showChangeAlert(changes) {
             let msg = "Sono stati rilevati cambi turno per gli autisti che segui:<br><br>";
-            msg += changes.slice(0, 5).join("<br>");
-            if(changes.length > 5) msg += `<br>...e altri ${changes.length - 5}.`;
+            msg += changes.slice(0, 5).join("<br><br>"); // Doppio <br> per spaziare meglio i dettagli
+            if(changes.length > 5) msg += `<br><br>...e altri ${changes.length - 5}.`;
             msg += "<br><br><small>Controlla il calendario aggiornato.</small>";
 
             let modal = document.getElementById('alert-modal');
@@ -1829,5 +1899,3 @@
             return `<div class="cell ${cssClass}">${text}</div>`;
         }
     </script>
-</body>
-</html>

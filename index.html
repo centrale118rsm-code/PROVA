@@ -61,6 +61,27 @@
             --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
+        /* --- ZOOM MODE VARIABLES --- */
+        body.zoom-mode {
+            --cell-h: 32px; /* Celle molto più basse */
+            --font-base: 0.7rem;
+            --font-small: 0.5rem;
+            --th-h: 30px;
+        }
+        /* Nascondi orari e badge in modalità zoom per pulizia */
+        body.zoom-mode .time-tag { display: none; }
+        body.zoom-mode .rep-badge { display: none; }
+        body.zoom-mode .holiday-name { font-size: 0.45rem; margin-top: 1px; }
+        body.zoom-mode .td-date small { font-size: 0.6rem; }
+        body.zoom-mode .cell { line-height: 32px; padding: 0; } /* Centra testo verticale */
+        
+        /* Evidenzia il bottone attivo */
+        body.zoom-mode .btn-action.zoom-active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
         /* --- DARK MODE VARIABLES --- */
         body.dark-mode {
             --bg: #0f172a; 
@@ -450,52 +471,11 @@
             z-index: 6010;
         }
         
-        /* --- MODALE AVVISI (VIGNETTA) --- */
-        #alert-modal {
-            display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); 
-            z-index: 9999; align-items: center; justify-content: center; 
-            opacity: 0; transition: opacity 0.3s; padding: 20px;
-        }
-        #alert-modal.open { opacity: 1; }
-
-        .alert-card {
-            background: var(--bg-card); width: 100%; max-width: 400px; 
-            border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); 
-            overflow: hidden; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 1px solid var(--border);
-        }
-        #alert-modal.open .alert-card { transform: scale(1); }
-
-        .alert-header {
-            padding: 20px 24px; display: flex; align-items: center; gap: 15px;
-            background: #fff7ed; border-bottom: 1px solid #ffedd5;
-        }
-        .alert-icon-box {
-            width: 45px; height: 45px; border-radius: 12px; background: #fffbeb; 
-            display: flex; align-items: center; justify-content: center;
-            color: #d97706; border: 1px solid #fcd34d; flex-shrink: 0;
-        }
-        .alert-title { font-weight: 800; font-size: 1.1rem; color: #92400e; line-height: 1.2; }
-
-        .alert-body { padding: 24px; font-size: 1rem; color: var(--text-main); line-height: 1.5; }
-
-        .alert-footer { padding: 0 24px 24px; }
-        .btn-alert-ok {
-            width: 100%; padding: 14px; border-radius: 14px; border: none;
-            background: #d97706; color: white; font-weight: 800; font-size: 1rem;
-            cursor: pointer; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-alert-ok:active { transform: scale(0.98); }
-
-        /* Dark mode overrides per l'alert */
-        body.dark-mode .alert-header { background: #451a03; border-color: #78350f; }
-        body.dark-mode .alert-icon-box { background: #78350f; border-color: #92400e; color: #fbbf24; }
-        body.dark-mode .alert-title { color: #fbbf24; }
-        
     </style>
 </head>
 <body>
+
+    <audio id="app-audio" loop src="audio.mp3"></audio>
 
     <div id="alert-modal">
         <div class="alert-card">
@@ -607,6 +587,17 @@
                 
                 <div class="option-item">
                     <div style="display:flex; flex-direction:column">
+                        <span style="font-size:1rem">Musica Sottofondo</span>
+                        <span style="font-size:0.8rem; color:var(--text-sec); font-weight:400">Attiva/Disattiva audio</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="audio-toggle" onchange="toggleAudio()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="option-item">
+                    <div style="display:flex; flex-direction:column">
                         <span style="font-size:1rem">Tema Scuro</span>
                         <span style="font-size:0.8rem; color:var(--text-sec); font-weight:400">Riduci affaticamento occhi</span>
                     </div>
@@ -694,6 +685,10 @@
             </div>
             <div class="right-controls">
                 
+                <button class="btn-action" id="btn-zoom" onclick="toggleZoom()">
+                    <span class="material-icons-round">zoom_out</span>
+                </button>
+
                 <button class="btn-action" onclick="vibrate(); scrollToToday()">
                     <span class="material-icons-round">home</span>
                 </button>
@@ -858,6 +853,10 @@
             
             const tg = document.getElementById('dark-mode-toggle');
             if(tg) tg.checked = document.body.classList.contains('dark-mode');
+
+            // Set Audio Toggle
+            const at = document.getElementById('audio-toggle');
+            if(at) at.checked = (localStorage.getItem('audio_enabled') === 'true');
         }
         
         function closeOptionsModal(e) {
@@ -879,6 +878,54 @@
             } else {
                 localStorage.setItem('theme', 'light');
                 meta.setAttribute('content', '#ffffff');
+            }
+        }
+
+        // --- GESTIONE AUDIO ---
+        function initAudio() {
+            const enabled = localStorage.getItem('audio_enabled') === 'true';
+            if(enabled) {
+                tryPlayAudio();
+            }
+        }
+
+        function toggleAudio() {
+            vibrate();
+            const at = document.getElementById('audio-toggle');
+            const audio = document.getElementById('app-audio');
+            
+            if(at.checked) {
+                localStorage.setItem('audio_enabled', 'true');
+                tryPlayAudio();
+            } else {
+                localStorage.setItem('audio_enabled', 'false');
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        }
+
+        function tryPlayAudio() {
+            const audio = document.getElementById('app-audio');
+            audio.volume = 0.5;
+            audio.play().catch(error => {
+                console.log("Autoplay bloccato. Attendo click.");
+                // Fallback: avvia al primo tocco
+                document.addEventListener('click', () => {
+                    if(localStorage.getItem('audio_enabled') === 'true') audio.play();
+                }, { once: true });
+            });
+        }
+
+        // --- NUOVA GESTIONE ZOOM ---
+        function toggleZoom() {
+            vibrate();
+            const btn = document.getElementById('btn-zoom');
+            document.body.classList.toggle('zoom-mode');
+            
+            if (document.body.classList.contains('zoom-mode')) {
+                btn.classList.add('zoom-active');
+            } else {
+                btn.classList.remove('zoom-active');
             }
         }
 
@@ -1054,6 +1101,7 @@
             
             initNotificationOptions();
             loadNotificationHistory(); // Carica notifiche salvate
+            initAudio(); // Carica stato audio
             renderTable();
             startLiveClock();
             setTimeout(scrollToToday, 600);
